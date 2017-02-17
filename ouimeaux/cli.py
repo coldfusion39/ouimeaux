@@ -24,8 +24,14 @@ def _state(device, readable=False):
 
 def scan(args, on_switch=NOOP, on_motion=NOOP, on_bridge=NOOP, on_maker=NOOP):
     try:
-        env = Environment(on_switch, on_motion, on_bridge, on_maker,
-                with_subscribers=False, bind=args.bind)
+        env = Environment(
+            on_switch,
+            on_motion,
+            on_bridge,
+            on_maker,
+            with_subscribers=False,
+            bind=args.bind
+        )
         env.start()
         env.discover(args.timeout)
     except KeyboardInterrupt:
@@ -49,8 +55,7 @@ def switch(args):
     elif args.state.lower() == "status":
         state = "status"
     else:
-        print("""No valid action specified. 
-Usage: wemo switch NAME (on|off|toggle|status)""")
+        print("No valid action specified.\nUsage: wemo switch NAME (on|off|toggle|status)")
         sys.exit(1)
 
     device_name = args.device
@@ -78,6 +83,7 @@ Usage: wemo switch NAME (on|off|toggle|status)""")
     print("No device found with that name.")
     sys.exit(1)
 
+
 def light(args):
     if args.state.lower() in ("on", "1", "true"):
         state = "on"
@@ -88,8 +94,7 @@ def light(args):
     elif args.state.lower() == "status":
         state = "status"
     else:
-        print("""No valid action specified. 
-Usage: wemo light NAME (on|off|toggle|status)""")
+        print("No valid action specified.\nUsage: wemo light NAME (on|off|toggle|status)")
         sys.exit(1)
 
     device_name = args.name
@@ -101,6 +106,11 @@ Usage: wemo light NAME (on|off|toggle|status)""")
     else:
         matches = NOOP
 
+    def convert_temperature(kelvin):
+        temperature_range = (153.8461538461538, 370.3703703703704)
+        temperature = max(temperature_range[0], min((1000000 / kelvin), temperature_range[1]))
+        return temperature
+
     def on_switch(switch):
         pass
 
@@ -110,6 +120,7 @@ Usage: wemo light NAME (on|off|toggle|status)""")
     def on_bridge(bridge):
         bridge.bridge_get_lights()
         bridge.bridge_get_groups()
+
         for light in bridge.Lights:
             if matches(light):
                 if args.state == "toggle":
@@ -117,22 +128,36 @@ Usage: wemo light NAME (on|off|toggle|status)""")
                     bridge.light_set_state(bridge.Lights[light], state=not found_state)
                 elif args.state == "status":
                     print(bridge.light_get_state(bridge.Lights[light]))
+
                 else:
-                    if args.dim == None and args.state == "on":
-                        dim = bridge.light_get_state(bridge.Lights[light]).get('dim')
+                    if args.state == "on":
                         state = 1
+                        if args.dim:
+                            if args.dim <= 255 and args.dim >= 0:
+                                dim = args.dim
+                            else:
+                                print("Invalid dim specified.\nDim must be between 0 and 255")
+                                sys.exit(1)
+                        else:
+                            dim = bridge.light_get_state(bridge.Lights[light]).get('dim')
+
+                        if args.temp:
+                            if args.temp <= 6500 and args.temp >= 1900:
+                                temp = convert_temperature(args.temp)
+                            else:
+                                print("Invalid temp specified.\nTemp must be between 1900 and 6500")
+                                sys.exit(1)
+                        else:
+                            temp = None
+
                     elif args.state == "off":
-                        dim = None
                         state = 0
-                    elif args.dim <= 255 and args.dim >= 0:
-                        dim = args.dim
-                        state = 1
-                    else:
-                        print("""Invalid dim specified. 
-Dim must be between 0 and 255""")
-                        sys.exit(1)
-                    bridge.light_set_state(bridge.Lights[light],state=state,dim=dim)
+                        dim = None
+                        temp = None
+
+                    bridge.light_set_state(bridge.Lights[light], state=state, dim=dim, temp=temp)
                 sys.exit(0)
+
         for group in bridge.Groups:
             if matches(group):
                 if args.state == "toggle":
@@ -140,27 +165,41 @@ Dim must be between 0 and 255""")
                     bridge.group_set_state(bridge.Groups[group], state=not found_state)
                 elif args.state == "status":
                     print(bridge.group_get_state(bridge.Groups[group]))
+
                 else:
-                    if args.dim == None and args.state == "on":
-                        dim = bridge.group_get_state(bridge.Groups[group]).get('dim')
+                    if args.state == "on":
                         state = 1
+                        if args.dim:
+                            if args.dim <= 255 and args.dim >= 0:
+                                dim = args.dim
+                            else:
+                                print("Invalid dim specified.\nDim must be between 0 and 255")
+                                sys.exit(1)
+                        else:
+                            dim = bridge.group_get_state(bridge.Groups[group]).get('dim')
+
+                        if args.temp:
+                            if args.temp <= 6500 and args.temp >= 1900:
+                                temp = convert_temperature(args.temp)
+                            else:
+                                print("Invalid temp specified.\nTemp must be between 1900 and 6500")
+                                sys.exit(1)
+                        else:
+                            temp = None
+
                     elif args.state == "off":
-                        dim = None
                         state = 0
-                    elif args.dim <= 255 and args.dim >= 0:
-                        dim = args.dim
-                        state = 1
-                    else:
-                        print("""Invalid dim specified.
-Dim must be between 0 and 255""")
-                        sys.exit(1)
-                    bridge.group_set_state(bridge.Groups[group],state=state,dim=dim)
+                        dim = None
+                        temp = None
+
+                    bridge.group_set_state(bridge.Groups[group], state=state, dim=dim, temp=temp)
                 sys.exit(0)
 
     scan(args, on_switch, on_motion, on_bridge)
     # If we got here, we didn't find anything
     print("No device or group found with that name.")
     sys.exit(1)
+
 
 def maker(args):
     if args.state.lower() in ("on", "1", "true"):
@@ -174,8 +213,7 @@ def maker(args):
     elif args.state.lower() == "switch":
         state = "switch"
     else:
-        print("""No valid action specified. 
-Usage: wemo maker NAME (on|off|toggle|sensor|switch)""")
+        print("No valid action specified.\nUsage: wemo maker NAME (on|off|toggle|sensor|switch)")
         sys.exit(1)
 
     device_name = args.device
@@ -186,16 +224,16 @@ Usage: wemo maker NAME (on|off|toggle|sensor|switch)""")
         matches = matcher(device_name)
     else:
         matches = NOOP
-        
+
     def on_switch(maker):
         return
 
     def on_motion(maker):
         return
-    
+
     def on_bridge(maker):
         return
-        
+
     def on_maker(maker):
         if matches(maker.name):
             if state == "toggle":
@@ -203,25 +241,25 @@ Usage: wemo maker NAME (on|off|toggle|sensor|switch)""")
                 maker.set_state(not found_state)
             elif state == "sensor":
                 if maker.has_sensor:
-                     if args.human_readable:
-                          if maker.sensor_state:
-                               sensorstate = 'Sensor not triggered'
-                          else:
-                               sensorstate = 'Sensor triggered'
-                          print(sensorstate)
-                     else:
-                          print(maker.sensor_state)
+                    if args.human_readable:
+                        if maker.sensor_state:
+                            sensorstate = 'Sensor not triggered'
+                        else:
+                            sensorstate = 'Sensor triggered'
+                            print(sensorstate)
+                    else:
+                        print(maker.sensor_state)
                 else:
-                     print("Sensor not present")
+                    print("Sensor not present")
             elif state == "switch":
-                 if maker.switch_mode:
-                      print("Momentary Switch")
-                 else:
-                      print(_state(maker, args.human_readable))
+                if maker.switch_mode:
+                    print("Momentary Switch")
+                else:
+                    print(_state(maker, args.human_readable))
             else:
                 getattr(maker, state)()
             sys.exit(0)
-            
+
     scan(args, on_switch, on_motion, on_bridge, on_maker)
     # If we got here, we didn't find anything
     print("No device found with that name.")
@@ -235,7 +273,7 @@ def list_(args):
 
     def on_motion(motion):
         print("Motion:", motion.name)
-        
+
     def on_maker(maker):
         print("Maker:", maker.name)
 
@@ -258,23 +296,23 @@ def status(args):
 
     def on_motion(motion):
         print("Motion:", motion.name, '\t', _state(motion, args.human_readable))
-        
+
     def on_maker(maker):
         if maker.switch_mode:
-             print("Maker:", maker.name, '\t', "Momentary State:", _state(maker, args.human_readable))
+            print("Maker:", maker.name, '\t', "Momentary State:", _state(maker, args.human_readable))
         else:
-             print("Maker:", maker.name, '\t', "Persistent State:", _state(maker, args.human_readable))
+            print("Maker:", maker.name, '\t', "Persistent State:", _state(maker, args.human_readable))
         if maker.has_sensor:
-             if args.human_readable:
-                  if maker.sensor_state:
-                       sensorstate = 'Sensor not triggered'
-                  else:
-                       sensorstate = 'Sensor triggered'
-                  print('\t\t\t', "Sensor:", sensorstate)
-             else:
-                  print('\t\t\t', "Sensor:", maker.sensor_state)
+            if args.human_readable:
+                if maker.sensor_state:
+                    sensorstate = 'Sensor not triggered'
+                else:
+                    sensorstate = 'Sensor triggered'
+                    print('\t\t\t', "Sensor:", sensorstate)
+            else:
+                print('\t\t\t', "Sensor:", maker.sensor_state)
         else:
-             print('\t\t\t' "Sensor not present")
+            print('\t\t\t' "Sensor not present")
 
     def on_bridge(bridge):
         print("Bridge:", bridge.name, '\t', _state(bridge, args.human_readable))
@@ -320,51 +358,113 @@ def wemo():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-b", "--bind", default=None,
-                        help="ip:port to which to bind the response server."
-                             " Default is localhost:54321")
-    parser.add_argument("-d", "--debug", action="store_true", default=False,
-                        help="Enable debug logging")
-    parser.add_argument("-e", "--exact-match", action="store_true", 
-                        default=False,
-                        help="Disable fuzzy matching for device names")
-    parser.add_argument("-v", "--human-readable", dest="human_readable", 
-                        action="store_true", default=False,
-                        help="Print statuses as human-readable words")
-    parser.add_argument("-t", "--timeout", type=int, default=5,
-                        help="Time in seconds to allow for discovery")
+    parser.add_argument(
+        "-b",
+        "--bind",
+        default=None,
+        help="ip:port to which to bind the response server. Default is localhost:54321"
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Enable debug logging"
+    )
+    parser.add_argument(
+        "-e",
+        "--exact-match",
+        action="store_true",
+        default=False,
+        help="Disable fuzzy matching for device names"
+    )
+    parser.add_argument(
+        "-v",
+        "--human-readable",
+        dest="human_readable",
+        action="store_true",
+        default=False,
+        help="Print statuses as human-readable words"
+    )
+    parser.add_argument(
+        "-t",
+        "--timeout",
+        type=int,
+        default=5,
+        help="Time in seconds to allow for discovery"
+    )
     subparsers = parser.add_subparsers()
 
-    statusparser = subparsers.add_parser("status", 
-                                         help="Print status of WeMo devices")
+    statusparser = subparsers.add_parser(
+        "status",
+        help="Print status of WeMo devices"
+    )
     statusparser.set_defaults(func=status)
 
-    stateparser = subparsers.add_parser("switch",
-                                        help="Turn a WeMo Switch on or off")
-    stateparser.add_argument("device", help="Name or alias of the device")
-    stateparser.add_argument("state", help="'on' or 'off'")
+    stateparser = subparsers.add_parser(
+        "switch",
+        help="Turn a WeMo Switch on or off"
+    )
+    stateparser.add_argument(
+        "device",
+        help="Name or alias of the device"
+    )
+    stateparser.add_argument(
+        "state",
+        help="'on' or 'off'"
+    )
     stateparser.set_defaults(func=switch)
-    
-    makerparser = subparsers.add_parser("maker", 
-                                       help="Get sensor or switch state of a Maker or Turn on or off")
-    makerparser.add_argument("device", help="Name or alias of the device")
-    makerparser.add_argument("state", help="'on' or 'off' or 'toggle' or 'sensor' or 'switch'")
+
+    makerparser = subparsers.add_parser(
+        "maker",
+        help="Get sensor or switch state of a Maker or Turn on or off"
+    )
+    makerparser.add_argument(
+        "device",
+        help="Name or alias of the device"
+    )
+    makerparser.add_argument(
+        "state",
+        help="'on' or 'off' or 'toggle' or 'sensor' or 'switch'"
+    )
     makerparser.set_defaults(func=maker)
 
-    stateparser = subparsers.add_parser("light",
-                                        help="Turn a WeMo LED light on or off")
-    stateparser.add_argument("name", help="Name or alias of the device or group")
-    stateparser.add_argument("state", help="'on' or 'off'")
-    stateparser.add_argument("dim", nargs='?', type=int,
-                        help="Dim value 0 to 255")
+    stateparser = subparsers.add_parser(
+        "light",
+        help="Turn a WeMo LED light on or off"
+    )
+    stateparser.add_argument(
+        "name",
+        help="Name or alias of the device or group"
+    )
+    stateparser.add_argument(
+        "state",
+        help="'on' or 'off'"
+    )
+    stateparser.add_argument(
+        "dim",
+        nargs='?',
+        type=int,
+        help="Dim value 0 to 255"
+    )
+    stateparser.add_argument(
+        "temp",
+        nargs='?',
+        type=int,
+        help="Temp value 1900 to 6500 (Kelvin)"
+    )
     stateparser.set_defaults(func=light)
 
-    listparser = subparsers.add_parser("list",
-                          help="List all devices found in the environment")
+    listparser = subparsers.add_parser(
+        "list",
+        help="List all devices found in the environment"
+    )
     listparser.set_defaults(func=list_)
 
-    serverparser = subparsers.add_parser("server",
-                          help="Run the API server and web app")
+    serverparser = subparsers.add_parser(
+        "server",
+        help="Run the API server and web app"
+    )
     serverparser.set_defaults(func=server)
 
     args = parser.parse_args()
